@@ -110,7 +110,7 @@ void Counter_init (void)
 	Calculating your count: OCR1A = (CPU_clock speed/TCCR_clock speed)-1
 	*OCR1A is being set to count in milliseconds*  
 	*/
-	OCR1A = 31249;   // timer compare value   8MHz/8 = 1MHZ = 1 second (out of range), and 1000 = 1ms
+	OCR1A = 31249;   // timer compare value   16MHz/256 = 62.5kHz, TOP = 31249 gives 0.5 seconds at 62.5kHz
 	
 	
 	TCNT1 = 0; // Initiates the timer to count CPU cycles.
