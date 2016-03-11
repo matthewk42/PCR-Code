@@ -93,14 +93,14 @@ int main(void)
 			*/
 
 			if (printFlag == 1){
-				send_serial(readTemp*10, count_ms);	// count_ms is incremented with a timer interrupt every half second
-				printFlag = 0;				// the effect is that the read temp is printed every half second
+				send_serial(readTemp*10, count_ms);	// count_ms is incremented with a timer interrupt every quarter second
+				printFlag = 0;				// the effect is that the read temp is printed every quarter second
 			
 	
 				_delay_ms(1);// don't forget about the delay in the adc_read function!
 			
 				if (readTemp < lowerRange){
-					OCR0A = (82 - (targetTemp-55)*2);//normalized to PWM @ 128 at 55C and increase duty cycle by 3 PWM values for each degree
+					OCR0A = (82 - (targetTemp-55)*2);//normalized to PWM @ 82 at 55C and increase duty cycle by 2 PWM values for each degree
 					PORTB = Fan_OFF;
 					PORTD = LED_OFF;
 				}
