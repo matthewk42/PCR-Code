@@ -24,12 +24,12 @@
 #include "ADC.h"
 
 volatile unsigned int count_ms = 0;
-volatile unsigned int printFlag = 0;
+volatile unsigned int timerFlag = 0;
 void Counter_init (void);
 
 ISR(TIMER1_COMPA_vect){
 	count_ms ++;
-	printFlag = 1;
+	timerFlag = 1;
 }
 
 // Testing:
@@ -68,17 +68,25 @@ int main(void)
 {
 	int isTime = 0;
 	int next = 0;
+	int numTemps = 0;
+	int timeAnneal = 40; // 40 seconds at 50C at 65C
+	int timeDenat = 30; // 30 seconds above 95C
+	int timeElong = 60; // 60 seconds at 70C and 80C
 	double readTemp;
 	double lowerRange = 0;
 	double upperRange = 0;
+	double temp = 0;
+	double avgTemp = 0.0;
 	init();
 	
-	lowerRange = targetTemp;// + 0.1;
-	upperRange = targetTemp;// + 0.1;
+	
 				
-	while(next != 1){
+	void holdAtTemp(uint16_t targetTemp, uint16_t targetTime){
 		
-		while(count_ms < 4*targetTime){
+		lowerRange = targetTemp;// + 0.1;
+		upperRange = targetTemp;// + 0.1;
+		
+		while(count_ms < 4*targetTime){//count increments at quarter seconds
 			
 			readTemp = getTemp();
 			/*
@@ -92,54 +100,79 @@ int main(void)
 			_delay_ms(1000);
 			*/
 
-			if (printFlag == 1){
+			/*
+			if (timerFlag == 1){
 				send_serial(readTemp*10, count_ms);	// count_ms is incremented with a timer interrupt every quarter second
-				printFlag = 0;				// the effect is that the read temp is printed every quarter second
-			
+				timerFlag = 0;						// the effect is that the read temp is printed every quarter second
+			*/
 	
-				_delay_ms(1);// don't forget about the delay in the adc_read function!
+			_delay_ms(1);// don't forget about the delay in the adc_read function!
 			
-				if (readTemp < lowerRange){
-					OCR0A = (82 - (targetTemp-55)*2);//normalized to PWM @ 82 at 55C and increase duty cycle by 2 PWM values for each degree
-					PORTB = Fan_OFF;
-					PORTD = LED_OFF;
-				}
-				else{
-					OCR0A = 255; // 0% duty cycle
-					PORTB = Fan_OFF;
-					PORTD = LED_ON;
-				}
+			if (readTemp < lowerRange){
+				OCR0A = (82 - (targetTemp-55)*2);	// normalized to PWM @ 82 at 55C and increase duty cycle by 2 PWM values for each degree
+				PORTB = Fan_OFF;					// turn off fan
+				PORTD = LED_OFF;					// turn off led
+			}
+			else{
+				OCR0A = 255;		// set heater to 0% duty cycle
+				PORTB = Fan_OFF;	// power off the fan
+				PORTD = LED_ON;		// turn on the led
+			}
+			/*
+			if (readTemp > lowerRange && readTemp < upperRange)
+			{
+				OCR0A = 128; //PWM duty cycle set to 0% PORTB = Heat_OFF; //
+				PORTB = Fan_OFF;
+				PORTD = LED_ON;
+			}
+			*/
+		
+			if (readTemp > (upperRange + 0.9)){
+				OCR0A = 255;		// heater PWM duty cycle set to 0%
+				PORTB = Fan_ON;		// turn on the fan
+				PORTD = LED_OFF;	// turn off led
+			}
+				
+			if (timerFlag == 1){	// timer flag is true every 1/4 second
+				temp += readTemp;	// sums gathered temperatures every 1/4 second
+				numTemps++;			// keep track of the number of temperatures gathered
+				timerFlag = 0;		// reset the 1/4 second timer flag
+			}
+				
+			//if (count_ms % 4 == 0 && count_ms != 0){ // this condition is true every 4 increments of count_ms, or every 1 second
+			if (numTemps == 4){	
+				avgTemp = temp / numTemps;	// average the gathered temperature readings
+				temp = 0;					// reset the summed temperatures
+				numTemps = 0;				// reset the number of gathered temperatures
+					
+				if (((avgTemp*10)/10 >= targetTemp+1) || ((avgTemp*10)/10 <= targetTemp-1)){ // if current temperature is outside of +/- 1C range
+					count_ms = 0; //reset counter if temp is outside of +/- 1C range
+				}	
+					
+				send_serial(avgTemp*10, count_ms);	// 
+				
+			} 
+				
 				/*
-				if (readTemp > lowerRange && readTemp < upperRange)
-				{
-					OCR0A = 128; //PWM duty cycle set to 0% PORTB = Heat_OFF; //
-					PORTB = Fan_OFF;
-					PORTD = LED_ON;
-				}
-				*/
-		
-				if (readTemp > (upperRange + 0.9)){
-					OCR0A = 255; //PWM duty cycle set to 0% PORTB = Heat_OFF; //
-					PORTB = Fan_ON;
-					PORTD = LED_OFF;
-				}
-		
 				if (((readTemp*10)/10 >= targetTemp+1) || ((readTemp*10)/10 <= targetTemp-1)){ // if current temperature is outside of +/- 1C range
 					count_ms = 0; // reset the counter if not in temperature range			
 				}
-			}			
-		}		
-		
+				*/
+		}			
+			
+		/*
 		while(1){
-			if (printFlag == 1){
+			if (timerFlag == 1){
 				send_serial(1010, 1010);
-				printFlag = 0;		// printed every quarter second
+				timerFlag = 0;		// printed every quarter second
 			}
 		}
-		
-	}	
+		*/
 	
-}
+	}		
+}	
+	
+
 
 
 void init(void){
