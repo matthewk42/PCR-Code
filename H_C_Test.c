@@ -81,15 +81,19 @@ int main(void)
 	*/
 	init();
 	
-	holdAtTemp(50,timeAnneal);
+	//holdAtTemp(95,10);
 	
-	holdAtTemp(65,timeAnneal);
+	//holdAtTemp(40,120);
 	
-	holdAtTemp(70,timeElong);
+	holdAtTemp(55,timeAnneal);
 	
-	holdAtTemp(80,timeElong);
+	//holdAtTemp(65,timeAnneal);
 	
-	holdAtTemp(96,timeDenat);
+	holdAtTemp(75,timeElong);
+	
+	//holdAtTemp(80,timeElong);
+	
+	holdAtTemp(95,timeDenat);
 	
 }	
 				
@@ -105,7 +109,7 @@ void holdAtTemp(uint16_t targetTemp, uint16_t targetTime){
 	lowerRange = targetTemp;// + 0.1;
 	upperRange = targetTemp;// + 0.1;
 		
-	while(count_ms < 4*targetTime){//count increments at quarter seconds
+	while(count_ms < 2*targetTime){//count increments at quarter seconds
 			
 		readTemp = getTemp();
 		/*
@@ -146,37 +150,53 @@ void holdAtTemp(uint16_t targetTemp, uint16_t targetTime){
 		}
 		*/
 		
-		if (readTemp > (upperRange + 0.9)){
+		if (readTemp > (upperRange + 1)){
 			OCR0A = 255;		// heater PWM duty cycle set to 0%
 			PORTB = Fan_ON;		// turn on the fan
 			PORTD = LED_OFF;	// turn off led
 		}
 				
-		if (timerFlag == 1){	// timer flag is true every 1/4 second
-			temp += readTemp;	// sums gathered temperatures every 1/4 second
+		if (timerFlag == 0){	// timer flag is true every 1/4 second
+			temp += readTemp;	// sums gathered temperatures
 			numTemps++;			// keep track of the number of temperatures gathered
-			timerFlag = 0;		// reset the 1/4 second timer flag
+			//timerFlag = 0;		// reset the 1/4 second timer flag
 		}
-				
-		//if (count_ms % 4 == 0 && count_ms != 0){ // this condition is true every 4 increments of count_ms, or every 1 second
-		if (numTemps == 4){	
+		
+		if (timerFlag == 1){
 			avgTemp = temp / numTemps;	// average the gathered temperature readings
 			temp = 0;					// reset the summed temperatures
 			numTemps = 0;				// reset the number of gathered temperatures
+			timerFlag = 0;
+			
+			if (((avgTemp*10)/10 >= targetTemp+2) || ((avgTemp*10)/10 <= targetTemp-2)){ // if current temperature is outside of +/- 1C range
+				count_ms = 0; //reset counter if temp is outside of +/- 1C range
+			}
+		
+			send_serial(avgTemp*10/10, count_ms);	//					
+		}
+								
+		//if (count_ms % 4 == 0 && count_ms != 0){ // this condition is true every 4 increments of count_ms, or every 1 second
+		/*
+		if (numTemps == 8){	
+			//avgTemp = temp / numTemps;	// average the gathered temperature readings
+			//temp = 0;					// reset the summed temperatures
+			//numTemps = 0;				// reset the number of gathered temperatures
 					
-			if (((avgTemp*10)/10 >= targetTemp+1) || ((avgTemp*10)/10 <= targetTemp-1)){ // if current temperature is outside of +/- 1C range
+			if (((avgTemp*10)/10 >= targetTemp+2) || ((avgTemp*10)/10 <= targetTemp-2)){ // if current temperature is outside of +/- 1C range
 				count_ms = 0; //reset counter if temp is outside of +/- 1C range
 			}	
 					
-			send_serial(avgTemp*10, count_ms);	// 
+			send_serial(avgTemp*10/10, count_ms);	// 
 				
 		} 
+		*/
 				
-			/*
-			if (((readTemp*10)/10 >= targetTemp+1) || ((readTemp*10)/10 <= targetTemp-1)){ // if current temperature is outside of +/- 1C range
-				count_ms = 0; // reset the counter if not in temperature range			
-			}
-			*/
+		/*
+		if (((readTemp*10)/10 >= targetTemp+1) || ((readTemp*10)/10 <= targetTemp-1)){ // if current temperature is outside of +/- 1C range
+			count_ms = 0; // reset the counter if not in temperature range			
+		}
+		send_serial(readTemp*10,count_ms);
+		*/
 	}			
 	
 	count_ms = 0; //reset counter		
@@ -237,7 +257,7 @@ void send_serial (uint16_t out, uint16_t count){
 	usb_serial_flush_input();	// we empty the data line before sending.
 	
 	// sprintf will take multiple data types and turn the whole line into a string.
-	sprintf(temp_string, "Temp: %u | Count: %u \n", out, count/4);
+	sprintf(temp_string, "Temp: %u | Count: %u \n", out, count/2);
 	send_strB(temp_string);
 }
 // this function takes all the characters and feeds them into the usb_serial data stream.
